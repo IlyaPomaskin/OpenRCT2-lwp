@@ -11,62 +11,77 @@ import android.view.WindowManager;
 
 
 /**
- SDLSurface. This is what we draw on, so we need to know when it's created
- in order to do anything useful.
-
- Because of this, that's where we set up the SDL thread
+ * SDLSurface. This is what we draw on, so we need to know when it's created
+ * in order to do anything useful.
+ * <p>
+ * Because of this, that's where we set up the SDL thread
  */
 
 public class SDLSurface extends SurfaceView implements SurfaceHolder.Callback {
+    private final String TAG = "SDLSurface";
+
     // Sensors
 //    protected static SensorManager mSensorManager;
     protected static Display mDisplay;
     // Keep track of the surface size to normalize touch events
     protected static float mWidth;
     protected static float mHeight;
+    protected static SurfaceHolder mmmSurfaceHolder;
 
     // Startup
     public SDLSurface(Context context) {
         super(context);
+        Log.v(TAG, "SDLSurface");
         getHolder().addCallback(this);
 
         setFocusable(true);
         setFocusableInTouchMode(true);
         requestFocus();
 
-        mDisplay = ((WindowManager)context.getSystemService(Context.WINDOW_SERVICE)).getDefaultDisplay();
+        mDisplay = ((WindowManager) context.getSystemService(Context.WINDOW_SERVICE)).getDefaultDisplay();
         mWidth = 1.0f;
         mHeight = 1.0f;
     }
 
     public void handlePause() {
+        Log.v(TAG, "handlePause");
     }
 
     public void handleResume() {
+        Log.v(TAG, "handleResume");
         setFocusable(true);
         setFocusableInTouchMode(true);
         requestFocus();
     }
 
     public Surface getNativeSurface() {
-        return getHolder().getSurface();
+        Log.v(TAG, "getNativeSurface");
+        Log.v(TAG, "getNativeSurface " + (getHolder() == null ? "null" : "not null"));
+        Log.v(TAG, "getNativeSurface " + (getHolder().getSurface() == null ? "null" : "not null"));
+        Log.v(TAG, "getNativeSurface mmm" + (mmmSurfaceHolder == null ? "null" : "not null"));
+        Log.v(TAG, "getNativeSurface mmm" + (mmmSurfaceHolder.getSurface() == null ? "null" : "not null"));
+        return mmmSurfaceHolder.getSurface();
     }
 
     public SurfaceHolder getSurfaceHolder() {
-        return getHolder();
+        Log.v(TAG, "getSurfaceHolder");
+        Log.v(TAG, "getSurfaceHolder " + (getHolder() == null ? "null" : "not null"));
+        Log.v(TAG, "getSurfaceHolder mmm" + (mmmSurfaceHolder == null ? "null" : "not null"));
+        return mmmSurfaceHolder;
     }
 
     // Called when we have a valid drawing surface
     @Override
     public void surfaceCreated(SurfaceHolder holder) {
-        Log.v("SDL", "surfaceCreated()");
-        holder.setType(SurfaceHolder.SURFACE_TYPE_GPU);
+        Log.v(TAG, "surfaceCreated");
+//        holder.setType(SurfaceHolder.SURFACE_TYPE_GPU);
+        mmmSurfaceHolder = holder;
     }
 
     // Called when we lose the surface
     @Override
     public void surfaceDestroyed(SurfaceHolder holder) {
-        Log.v("SDL", "surfaceDestroyed()");
+        Log.v(TAG, "surfaceDestroyed()");
         // Call this *before* setting mIsSurfaceReady to 'false'
         SDLActivity.handlePause();
         SDLActivity.mIsSurfaceReady = false;
@@ -126,41 +141,8 @@ public class SDLSurface extends SurfaceView implements SurfaceHolder.Callback {
 
         mWidth = width;
         mHeight = height;
-        Log.v("openrct2", "onWindowResize: " + width + "x" + height);
         SDLActivity.onNativeResize(width, height, sdlFormat, mDisplay.getRefreshRate());
         Log.v("SDL", "Window size: " + width + "x" + height);
-
-
-        boolean skip = false;
-//        int requestedOrientation = SDLActivity.mSingleton.getRequestedOrientation();
-//
-//        if (requestedOrientation == ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED) {
-//            // Accept any
-//        } else if (requestedOrientation == ActivityInfo.SCREEN_ORIENTATION_PORTRAIT) {
-//            if (mWidth > mHeight) {
-//                skip = true;
-//            }
-//        } else if (requestedOrientation == ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE) {
-//            if (mWidth < mHeight) {
-//                skip = true;
-//            }
-//        }
-
-        // Special Patch for Square Resolution: Black Berry Passport
-//        if (skip) {
-//            double min = Math.min(mWidth, mHeight);
-//            double max = Math.max(mWidth, mHeight);
-//
-//            if (max / min < 1.20) {
-//                Log.v("SDL", "Don't skip on such aspect-ratio. Could be a square resolution.");
-//                skip = false;
-//            }
-//        }
-//
-//        if (skip) {
-//            Log.v("SDL", "Skip .. Surface is not ready.");
-//            return;
-//        }
 
 
         // Set mIsSurfaceReady to 'true' *before* making a call to handleResume

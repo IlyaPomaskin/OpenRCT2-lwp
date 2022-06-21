@@ -24,7 +24,7 @@ import java.io.InputStream;
 import java.lang.reflect.Method;
 
 public class SDLActivity extends WallpaperService {
-    private static final String TAG = "SDL";
+    private static final String TAG = "SDLActivity";
     public static boolean mIsPaused, mIsSurfaceReady, mHasFocus;
     public static boolean mExitCalledFromJava;
     /**
@@ -50,21 +50,20 @@ public class SDLActivity extends WallpaperService {
      * @return names of shared libraries to be loaded (e.g. "SDL2", "main").
      */
     protected String[] getLibraries() {
+        Log.v(TAG, "getLibraries");
         return new String[]{
             "c++_shared",
             "speexdsp",
             "png16",
             "SDL2-2.0",
-//            "main",
             "openrct2",
             "openrct2-ui"
         };
     }
 
     public void loadLibraries() {
+        Log.v(TAG, "loadLibraries");
         for (String lib : getLibraries()) {
-            Log.v("io.openrct2", "Load library");
-            Log.v("io.openrct2", lib);
             System.loadLibrary(lib);
         }
     }
@@ -77,10 +76,17 @@ public class SDLActivity extends WallpaperService {
      * @return arguments for the native application.
      */
     public String[] getArguments() {
-        return new String[]{"--verbose", "--rct2-data-path=\"/sdcard/openrct2\""};
+        Log.v(TAG, "getArguments");
+        return new String[]{
+            "--verbose",
+            "--rct2-data-path=\"/sdcard/rct2\"",
+            "--openrct2-data-path==\"/sdcard/openrct2\"",
+            "--user-data-path==\"/sdcard/openrct2-user\""
+        };
     }
 
     public static void initialize() {
+        Log.v(TAG, "initialize");
         mSingleton = null;
         mSurface = null;
         mTextEdit = null;
@@ -184,6 +190,7 @@ public class SDLActivity extends WallpaperService {
     }
 
     public static void handlePause() {
+        Log.v(TAG, "handlePause");
         if (!SDLActivity.mIsPaused && SDLActivity.mIsSurfaceReady) {
             SDLActivity.mIsPaused = true;
             SDLActivity.nativePause();
@@ -197,6 +204,7 @@ public class SDLActivity extends WallpaperService {
      * every time we get one of those events, only if it comes after surfaceDestroyed
      */
     public static void handleResume() {
+        Log.v(TAG, "handleResume");
         if (SDLActivity.mIsPaused && SDLActivity.mIsSurfaceReady && SDLActivity.mHasFocus) {
             SDLActivity.mIsPaused = false;
             SDLActivity.nativeResume();
@@ -206,6 +214,7 @@ public class SDLActivity extends WallpaperService {
 
     /* The native thread has finished */
     public static void handleNativeExit() {
+        Log.v(TAG, "handleNativeExit");
         SDLActivity.mSDLThread = null;
 //        mSingleton.finish();
         SDLActivity.mSingleton.stopSelf();
@@ -230,6 +239,7 @@ public class SDLActivity extends WallpaperService {
      * @return if the message was handled in overridden method.
      */
     protected boolean onUnhandledMessage(int command, Object param) {
+        Log.v(TAG, "onUnhandledMessage");
         return false;
     }
 
@@ -241,6 +251,7 @@ public class SDLActivity extends WallpaperService {
     protected static class SDLCommandHandler extends Handler {
         @Override
         public void handleMessage(Message msg) {
+            Log.v(TAG, "handleMessage");
             Context context = getContext();
             if (context == null) {
                 Log.e(TAG, "error handling message, getContext() returned null");
@@ -273,6 +284,7 @@ public class SDLActivity extends WallpaperService {
 
     // Send a message from the SDLMain thread
     boolean sendCommand(int command, Object data) {
+        Log.v(TAG, "sendCommand");
         Message msg = commandHandler.obtainMessage();
         msg.arg1 = command;
         msg.obj = data;
@@ -348,6 +360,7 @@ public class SDLActivity extends WallpaperService {
      * This method is called by SDL using JNI.
      */
     public static Context getContext() {
+        Log.v(TAG, "getContext");
         return mSingleton;
     }
 
@@ -357,6 +370,7 @@ public class SDLActivity extends WallpaperService {
      * @return result of getSystemService(name) but executed on UI thread.
      */
     public Object getSystemServiceFromUiThread(final String name) {
+        Log.v(TAG, "getSystemService");
         final Object lock = new Object();
         final Object[] results = new Object[2]; // array for writable variables
         synchronized (lock) {
@@ -392,6 +406,7 @@ public class SDLActivity extends WallpaperService {
      * This method is called by SDL using JNI.
      */
     public static Surface getNativeSurface() {
+        Log.v(TAG, "getNativeSurface");
         return SDLActivity.mSurface.getNativeSurface();
     }
 
@@ -434,7 +449,6 @@ public class SDLActivity extends WallpaperService {
     public static int captureReadByteBuffer(byte[] buffer, boolean blocking) {
         return 0;
     }
-
 
     /**
      * This method is called by SDL using JNI.
@@ -492,6 +506,7 @@ public class SDLActivity extends WallpaperService {
      * @throws IOException on errors. Message is set for the SDL error message.
      */
     public InputStream openAPKExpansionInputStream(String fileName) throws IOException {
+        Log.v(TAG, "openAPK");
         // Get a ZipResourceFile representing a merger of both the main and patch files
         if (expansionFile == null) {
             String mainHint = nativeGetHint("SDL_ANDROID_APK_EXPANSION_MAIN_FILE_VERSION");
@@ -627,18 +642,21 @@ public class SDLActivity extends WallpaperService {
 
     @Override
     public Engine onCreateEngine() {
+        Log.v(TAG, "onCreateEngine");
         return new LwpEngine();
     }
 
     class LwpEngine extends Engine {
-        private final SDLSurface mSurf = new SDLSurface(getContext());
+        private final SDLSurface mSurf = new SDLSurface(getApplication());
 
         LwpEngine() {
             super();
+            Log.v(TAG, "LwpEngine");
         }
 
         @Override
         public void onVisibilityChanged(boolean visible) {
+            Log.v(TAG, "onVisibilityChange");
             if (visible) {
                 mSurf.handleResume();
             } else {
@@ -649,25 +667,30 @@ public class SDLActivity extends WallpaperService {
         @Override
         public void onCreate(SurfaceHolder surfaceHolder) {
             super.onCreate(surfaceHolder);
+            Log.v(TAG, "Engine onCreate");
         }
 
         @Override
         public SurfaceHolder getSurfaceHolder() {
+            Log.v(TAG, "Engine getSurfaceHolder");
             return mSurf.getSurfaceHolder();
         }
 
         @Override
         public void onSurfaceCreated(SurfaceHolder holder) {
+            Log.v(TAG, "Engine onSurfaceCreated");
             mSurf.surfaceCreated(holder);
         }
 
         @Override
         public void onSurfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+            Log.v(TAG, "Engine onSurfaceChanged");
             mSurf.surfaceChanged(holder, format, width, height);
         }
 
         @Override
         public void onSurfaceDestroyed(SurfaceHolder holder) {
+            Log.v(TAG, "Engine onSurfaceDestroyed");
             mSurf.surfaceDestroyed(holder);
         }
     }
