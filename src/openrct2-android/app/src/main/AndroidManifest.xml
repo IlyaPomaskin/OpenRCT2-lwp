@@ -25,15 +25,9 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity
-            android:name=".GameActivity"
-            android:configChanges="keyboardHidden|orientation|screenSize"
-            android:screenOrientation="portrait">
-
-        </activity>
 
         <service
-            android:name=".LwpService"
+            android:name=".SDLActivity"
             android:enabled="true"
             android:label="A OpenRCT2 Wallpaper"
             android:permission="android.permission.BIND_WALLPAPER"
