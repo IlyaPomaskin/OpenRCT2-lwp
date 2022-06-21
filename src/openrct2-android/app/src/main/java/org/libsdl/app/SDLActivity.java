@@ -1,50 +1,42 @@
 package org.libsdl.app;
 
+import android.app.AlertDialog;
+import android.content.Context;
+import android.content.DialogInterface;
+import android.graphics.PixelFormat;
+import android.media.AudioRecord;
+import android.media.AudioTrack;
+import android.os.Handler;
+import android.os.Message;
+import android.service.wallpaper.WallpaperService;
+import android.util.Log;
+import android.view.Display;
+import android.view.MotionEvent;
+import android.view.Surface;
+import android.view.SurfaceHolder;
+import android.view.SurfaceView;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.WindowManager;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Method;
 
-import android.app.*;
-import android.content.*;
-import android.view.*;
-import android.view.inputmethod.InputMethodManager;
-import android.widget.RelativeLayout;
-import android.widget.Button;
-import android.widget.LinearLayout;
-import android.widget.TextView;
-import android.os.*;
-import android.util.Log;
-import android.util.SparseArray;
-import android.graphics.*;
-import android.graphics.drawable.Drawable;
-import android.media.*;
-
-/**
- * SDL Activity
- */
-public class SDLActivity extends Activity {
+public class SDLActivity extends WallpaperService {
     private static final String TAG = "SDL";
-
     public static boolean mIsPaused, mIsSurfaceReady, mHasFocus;
     public static boolean mExitCalledFromJava;
-
     /**
      * If shared libraries (e.g. SDL or the native application) could not be loaded.
      */
     public static boolean mBrokenLibraries;
-
     public static boolean mSeparateMouseAndTouch;
-
-    // Main components
-    protected static SDLActivity mSingleton;
+    public static SDLActivity mSingleton;
     protected static SDLSurface mSurface;
     protected static View mTextEdit;
     protected static ViewGroup mLayout;
-
-    // This is what SDL runs in. It invokes SDL_main(), eventually
-    protected static Thread mSDLThread;
-
-    // Audio
+    public static Thread mSDLThread;
     protected static AudioTrack mAudioTrack;
     protected static AudioRecord mAudioRecord;
 
@@ -59,18 +51,20 @@ public class SDLActivity extends Activity {
      */
     protected String[] getLibraries() {
         return new String[]{
-            "SDL2",
-            // "SDL2_image",
-            // "SDL2_mixer",
-            // "SDL2_net",
-            // "SDL2_ttf",
-            "main"
+            "c++_shared",
+            "speexdsp",
+            "png16",
+            "SDL2-2.0",
+//            "main",
+            "openrct2",
+            "openrct2-ui"
         };
     }
 
-    // Load the .so
     public void loadLibraries() {
         for (String lib : getLibraries()) {
+            Log.v("io.openrct2", "Load library");
+            Log.v("io.openrct2", lib);
             System.loadLibrary(lib);
         }
     }
@@ -82,13 +76,11 @@ public class SDLActivity extends Activity {
      *
      * @return arguments for the native application.
      */
-    protected String[] getArguments() {
-        return new String[0];
+    public String[] getArguments() {
+        return new String[]{"--verbose", "--rct2-data-path=\"/sdcard/openrct2\""};
     }
 
     public static void initialize() {
-        // The static nature of the singleton and Android quirkyness force us to initialize everything here
-        // Otherwise, when exiting the app and returning to it, these variables *keep* their pre exit values
         mSingleton = null;
         mSurface = null;
         mTextEdit = null;
@@ -103,19 +95,16 @@ public class SDLActivity extends Activity {
         mHasFocus = true;
     }
 
-    // Setup
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
+    public void onCreate() {
         Log.v(TAG, "Device: " + android.os.Build.DEVICE);
         Log.v(TAG, "Model: " + android.os.Build.MODEL);
         Log.v(TAG, "onCreate(): " + mSingleton);
-        super.onCreate(savedInstanceState);
+        super.onCreate();
 
         SDLActivity.initialize();
-        // So we can call stuff from static callbacks
         mSingleton = this;
 
-        // Load shared libraries
         String errorMsgBrokenLib = "";
         try {
             loadLibraries();
@@ -137,7 +126,8 @@ public class SDLActivity extends Activity {
                     @Override
                     public void onClick(DialogInterface dialog, int id) {
                         // if this button is clicked, close current activity
-                        SDLActivity.mSingleton.finish();
+//                        LwpService.mSingleton.finish();
+                        SDLActivity.mSingleton.stopSelf();
                     }
                 });
             dlgAlert.setCancelable(false);
@@ -146,64 +136,7 @@ public class SDLActivity extends Activity {
             return;
         }
 
-        // Set up the surface
         mSurface = new SDLSurface(getApplication());
-        mLayout = new RelativeLayout(this);
-        mLayout.addView(mSurface);
-
-        setContentView(mLayout);
-
-        // Get filename from "Open with" of another application
-        Intent intent = getIntent();
-
-        if (intent != null && intent.getData() != null) {
-            String filename = intent.getData().getPath();
-            if (filename != null) {
-                Log.v(TAG, "Got filename: " + filename);
-                SDLActivity.onNativeDropFile(filename);
-            }
-        }
-    }
-
-    // Events
-    @Override
-    protected void onPause() {
-        Log.v(TAG, "onPause()");
-        super.onPause();
-
-        if (SDLActivity.mBrokenLibraries) {
-            return;
-        }
-
-        SDLActivity.handlePause();
-    }
-
-    @Override
-    protected void onResume() {
-        Log.v(TAG, "onResume()");
-        super.onResume();
-
-        if (SDLActivity.mBrokenLibraries) {
-            return;
-        }
-
-        SDLActivity.handleResume();
-    }
-
-
-    @Override
-    public void onWindowFocusChanged(boolean hasFocus) {
-        super.onWindowFocusChanged(hasFocus);
-        Log.v(TAG, "onWindowFocusChanged(): " + hasFocus);
-
-        if (SDLActivity.mBrokenLibraries) {
-            return;
-        }
-
-        SDLActivity.mHasFocus = hasFocus;
-        if (hasFocus) {
-            SDLActivity.handleResume();
-        }
     }
 
     @Override
@@ -219,7 +152,7 @@ public class SDLActivity extends Activity {
     }
 
     @Override
-    protected void onDestroy() {
+    public void onDestroy() {
         Log.v(TAG, "onDestroy()");
 
         if (SDLActivity.mBrokenLibraries) {
@@ -250,16 +183,6 @@ public class SDLActivity extends Activity {
         SDLActivity.initialize();
     }
 
-    @Override
-    public boolean dispatchKeyEvent(KeyEvent event) {
-        return false;
-    }
-
-    /**
-     * Called by onPause or surfaceDestroyed. Even if surfaceDestroyed
-     * is the first to be called, mIsSurfaceReady should still be set
-     * to 'true' during the call to onPause (in a usual scenario).
-     */
     public static void handlePause() {
         if (!SDLActivity.mIsPaused && SDLActivity.mIsSurfaceReady) {
             SDLActivity.mIsPaused = true;
@@ -284,7 +207,8 @@ public class SDLActivity extends Activity {
     /* The native thread has finished */
     public static void handleNativeExit() {
         SDLActivity.mSDLThread = null;
-        mSingleton.finish();
+//        mSingleton.finish();
+        SDLActivity.mSingleton.stopSelf();
     }
 
 
@@ -324,32 +248,17 @@ public class SDLActivity extends Activity {
             }
             switch (msg.arg1) {
                 case COMMAND_CHANGE_TITLE:
-                    if (context instanceof Activity) {
-                        ((Activity) context).setTitle((String) msg.obj);
-                    } else {
-                        Log.e(TAG, "error handling message, getContext() returned no Activity");
-                    }
-                    break;
                 case COMMAND_TEXTEDIT_HIDE:
-                    if (mTextEdit != null) {
-                        // Note: On some devices setting view to GONE creates a flicker in landscape.
-                        // Setting the View's sizes to 0 is similar to GONE but without the flicker.
-                        // The sizes will be set to useful values when the keyboard is shown again.
-                        mTextEdit.setLayoutParams(new RelativeLayout.LayoutParams(0, 0));
-
-                        InputMethodManager imm = (InputMethodManager) context.getSystemService(Context.INPUT_METHOD_SERVICE);
-                        imm.hideSoftInputFromWindow(mTextEdit.getWindowToken(), 0);
-                    }
                     break;
                 case COMMAND_SET_KEEP_SCREEN_ON: {
-                    Window window = ((Activity) context).getWindow();
-                    if (window != null) {
-                        if ((msg.obj instanceof Integer) && (((Integer) msg.obj).intValue() != 0)) {
-                            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-                        } else {
-                            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-                        }
-                    }
+//                    Window window = ((Activity) context).getWindow();
+//                    if (window != null) {
+//                        if ((msg.obj instanceof Integer) && (((Integer) msg.obj).intValue() != 0)) {
+//                            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+//                        } else {
+//                            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+//                        }
+//                    }
                     break;
                 }
                 default:
@@ -360,8 +269,7 @@ public class SDLActivity extends Activity {
         }
     }
 
-    // Handler for the messages
-    Handler commandHandler = new SDLCommandHandler();
+    Handler commandHandler = new SDLActivity.SDLCommandHandler();
 
     // Send a message from the SDLMain thread
     boolean sendCommand(int command, Object data) {
@@ -371,7 +279,6 @@ public class SDLActivity extends Activity {
         return commandHandler.sendMessage(msg);
     }
 
-    // C functions we call
     public static native int nativeInit(Object arguments);
 
     public static native void nativeLowMemory();
@@ -453,7 +360,7 @@ public class SDLActivity extends Activity {
         final Object lock = new Object();
         final Object[] results = new Object[2]; // array for writable variables
         synchronized (lock) {
-            runOnUiThread(new Runnable() {
+            (new Runnable() {
                 @Override
                 public void run() {
                     synchronized (lock) {
@@ -462,7 +369,7 @@ public class SDLActivity extends Activity {
                         lock.notify();
                     }
                 }
-            });
+            }).run();
             if (results[1] == null) {
                 try {
                     lock.wait();
@@ -542,32 +449,16 @@ public class SDLActivity extends Activity {
     }
 
 
-    // Input
-
     /**
      * This method is called by SDL using JNI.
      *
      * @return an array which may be empty but is never null.
      */
     public static int[] inputGetInputDeviceIds(int sources) {
-//        int[] ids = InputDevice.getDeviceIds();
-//        int[] filtered = new int[ids.length];
-//        int used = 0;
-//        for (int i = 0; i < ids.length; ++i) {
-//            InputDevice device = InputDevice.getDevice(ids[i]);
-//            if ((device != null) && ((device.getSources() & sources) != 0)) {
-//                filtered[used++] = device.getId();
-//            }
-//        }
-//        return Arrays.copyOf(filtered, used);
-
         return new int[0];
     }
 
-    // Joystick glue code, just a series of stubs that redirect to the SDLJoystickHandler instance
     public static boolean handleJoystickMotionEvent(MotionEvent event) {
-//        return mJoystickHandler.handleMotionEvent(event);
-
         return false;
     }
 
@@ -575,25 +466,10 @@ public class SDLActivity extends Activity {
      * This method is called by SDL using JNI.
      */
     public static void pollInputDevices() {
-//        if (SDLActivity.mSDLThread != null) {
-//            mJoystickHandler.pollInputDevices();
-//        }
     }
 
     // Check if a given device is considered a possible SDL joystick
     public static boolean isDeviceSDLJoystick(int deviceId) {
-//        InputDevice device = InputDevice.getDevice(deviceId);
-//        // We cannot use InputDevice.isVirtual before API 16, so let's accept
-//        // only nonnegative device ids (VIRTUAL_KEYBOARD equals -1)
-//        if ((device == null) || (deviceId < 0)) {
-//            return false;
-//        }
-//        int sources = device.getSources();
-//        return (((sources & InputDevice.SOURCE_CLASS_JOYSTICK) == InputDevice.SOURCE_CLASS_JOYSTICK) ||
-//                ((sources & InputDevice.SOURCE_DPAD) == InputDevice.SOURCE_DPAD) ||
-//                ((sources & InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD)
-//        );
-
         return false;
     }
 
@@ -672,8 +548,6 @@ public class SDLActivity extends Activity {
         return fileStream;
     }
 
-    // Messagebox
-
     /**
      * Result of current messagebox. Also used for blocking the calling thread.
      */
@@ -713,185 +587,89 @@ public class SDLActivity extends Activity {
         }
 
         // collect arguments for Dialog
+//
+//        final Bundle args = new Bundle();
+//        args.putInt("flags", flags);
+//        args.putString("title", title);
+//        args.putString("message", message);
+//        args.putIntArray("buttonFlags", buttonFlags);
+//        args.putIntArray("buttonIds", buttonIds);
+//        args.putStringArray("buttonTexts", buttonTexts);
+//        args.putIntArray("colors", colors);
 
-        final Bundle args = new Bundle();
-        args.putInt("flags", flags);
-        args.putString("title", title);
-        args.putString("message", message);
-        args.putIntArray("buttonFlags", buttonFlags);
-        args.putIntArray("buttonIds", buttonIds);
-        args.putStringArray("buttonTexts", buttonTexts);
-        args.putIntArray("colors", colors);
+        System.out.printf("title: %s message: %s\n", title, message);
 
         // trigger Dialog creation on UI thread
-
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                showDialog(dialogs++, args);
-            }
-        });
+//
+//        (new Runnable() {
+//            @Override
+//            public void run() {
+////                showDialog(dialogs++, args);
+//            }
+//        }).run();
 
         // block the calling thread
 
-        synchronized (messageboxSelection) {
-            try {
-                messageboxSelection.wait();
-            } catch (InterruptedException ex) {
-                ex.printStackTrace();
-                return -1;
-            }
-        }
+//        synchronized (messageboxSelection) {
+//            try {
+//                messageboxSelection.wait();
+//            } catch (InterruptedException ex) {
+//                ex.printStackTrace();
+//                return -1;
+//            }
+//        }
 
         // return selected value
 
         return messageboxSelection[0];
     }
 
+
     @Override
-    protected Dialog onCreateDialog(int ignore, Bundle args) {
-
-        // TODO set values from "flags" to messagebox dialog
-
-        // get colors
-
-        int[] colors = args.getIntArray("colors");
-        int backgroundColor;
-        int textColor;
-        int buttonBorderColor;
-        int buttonBackgroundColor;
-        int buttonSelectedColor;
-        if (colors != null) {
-            int i = -1;
-            backgroundColor = colors[++i];
-            textColor = colors[++i];
-            buttonBorderColor = colors[++i];
-            buttonBackgroundColor = colors[++i];
-            buttonSelectedColor = colors[++i];
-        } else {
-            backgroundColor = Color.TRANSPARENT;
-            textColor = Color.TRANSPARENT;
-            buttonBorderColor = Color.TRANSPARENT;
-            buttonBackgroundColor = Color.TRANSPARENT;
-            buttonSelectedColor = Color.TRANSPARENT;
-        }
-
-        // create dialog with title and a listener to wake up calling thread
-
-        final Dialog dialog = new Dialog(this);
-        dialog.setTitle(args.getString("title"));
-        dialog.setCancelable(false);
-        dialog.setOnDismissListener(new DialogInterface.OnDismissListener() {
-            @Override
-            public void onDismiss(DialogInterface unused) {
-                synchronized (messageboxSelection) {
-                    messageboxSelection.notify();
-                }
-            }
-        });
-
-        // create text
-
-        TextView message = new TextView(this);
-        message.setGravity(Gravity.CENTER);
-        message.setText(args.getString("message"));
-        if (textColor != Color.TRANSPARENT) {
-            message.setTextColor(textColor);
-        }
-
-        // create buttons
-
-        int[] buttonFlags = args.getIntArray("buttonFlags");
-        int[] buttonIds = args.getIntArray("buttonIds");
-        String[] buttonTexts = args.getStringArray("buttonTexts");
-
-        final SparseArray<Button> mapping = new SparseArray<Button>();
-
-        LinearLayout buttons = new LinearLayout(this);
-        buttons.setOrientation(LinearLayout.HORIZONTAL);
-        buttons.setGravity(Gravity.CENTER);
-        for (int i = 0; i < buttonTexts.length; ++i) {
-            Button button = new Button(this);
-            final int id = buttonIds[i];
-            button.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    messageboxSelection[0] = id;
-                    dialog.dismiss();
-                }
-            });
-            if (buttonFlags[i] != 0) {
-                // see SDL_messagebox.h
-                if ((buttonFlags[i] & 0x00000001) != 0) {
-                    mapping.put(KeyEvent.KEYCODE_ENTER, button);
-                }
-                if ((buttonFlags[i] & 0x00000002) != 0) {
-                    mapping.put(111, button); /* API 11: KeyEvent.KEYCODE_ESCAPE */
-                }
-            }
-            button.setText(buttonTexts[i]);
-            if (textColor != Color.TRANSPARENT) {
-                button.setTextColor(textColor);
-            }
-            if (buttonBorderColor != Color.TRANSPARENT) {
-                // TODO set color for border of messagebox button
-            }
-            if (buttonBackgroundColor != Color.TRANSPARENT) {
-                Drawable drawable = button.getBackground();
-                if (drawable == null) {
-                    // setting the color this way removes the style
-                    button.setBackgroundColor(buttonBackgroundColor);
-                } else {
-                    // setting the color this way keeps the style (gradient, padding, etc.)
-                    drawable.setColorFilter(buttonBackgroundColor, PorterDuff.Mode.MULTIPLY);
-                }
-            }
-            if (buttonSelectedColor != Color.TRANSPARENT) {
-                // TODO set color for selected messagebox button
-            }
-            buttons.addView(button);
-        }
-
-        // create content
-
-        LinearLayout content = new LinearLayout(this);
-        content.setOrientation(LinearLayout.VERTICAL);
-        content.addView(message);
-        content.addView(buttons);
-        if (backgroundColor != Color.TRANSPARENT) {
-            content.setBackgroundColor(backgroundColor);
-        }
-
-        // add content to dialog and return
-
-        dialog.setContentView(content);
-        dialog.setOnKeyListener(new Dialog.OnKeyListener() {
-            @Override
-            public boolean onKey(DialogInterface d, int keyCode, KeyEvent event) {
-                Button button = mapping.get(keyCode);
-                if (button != null) {
-                    if (event.getAction() == KeyEvent.ACTION_UP) {
-                        button.performClick();
-                    }
-                    return true; // also for ignored actions
-                }
-                return false;
-            }
-        });
-
-        return dialog;
+    public Engine onCreateEngine() {
+        return new LwpEngine();
     }
-}
 
-/**
- * Simple nativeInit() runnable
- */
-class SDLMain implements Runnable {
-    @Override
-    public void run() {
-        // Runs SDL_main()
-        SDLActivity.nativeInit(SDLActivity.mSingleton.getArguments());
+    class LwpEngine extends Engine {
+        private final SDLSurface mSurf = new SDLSurface(getContext());
 
-        //Log.v("SDL", "SDL thread terminated");
+        LwpEngine() {
+            super();
+        }
+
+        @Override
+        public void onVisibilityChanged(boolean visible) {
+            if (visible) {
+                mSurf.handleResume();
+            } else {
+                mSurf.handlePause();
+            }
+        }
+
+        @Override
+        public void onCreate(SurfaceHolder surfaceHolder) {
+            super.onCreate(surfaceHolder);
+        }
+
+        @Override
+        public SurfaceHolder getSurfaceHolder() {
+            return mSurf.getSurfaceHolder();
+        }
+
+        @Override
+        public void onSurfaceCreated(SurfaceHolder holder) {
+            mSurf.surfaceCreated(holder);
+        }
+
+        @Override
+        public void onSurfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+            mSurf.surfaceChanged(holder, format, width, height);
+        }
+
+        @Override
+        public void onSurfaceDestroyed(SurfaceHolder holder) {
+            mSurf.surfaceDestroyed(holder);
+        }
     }
+
 }

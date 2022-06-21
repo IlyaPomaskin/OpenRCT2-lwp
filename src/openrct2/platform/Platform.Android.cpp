@@ -152,7 +152,7 @@ AndroidClassLoader::AndroidClassLoader()
     // makes sense to use one that's most likely already loaded and is unlikely
     // to be removed from code.
 //    auto randomClass = env->FindClass("io/openrct2/MainActivity");
-    auto randomClass = env->FindClass("io/openrct2/LwpService");
+    auto randomClass = env->FindClass("io/openrct2/SDLActivity");
     jclass classClass = env->GetObjectClass(randomClass);
 
     // Get its class loader

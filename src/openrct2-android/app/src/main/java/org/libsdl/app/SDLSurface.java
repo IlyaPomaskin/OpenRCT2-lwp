@@ -68,9 +68,9 @@ public class SDLSurface extends SurfaceView implements SurfaceHolder.Callback {
     public void surfaceDestroyed(SurfaceHolder holder) {
         Log.v("SDL", "surfaceDestroyed()");
         // Call this *before* setting mIsSurfaceReady to 'false'
-        LwpService.handlePause();
-        LwpService.mIsSurfaceReady = false;
-        LwpService.onNativeSurfaceDestroyed();
+        SDLActivity.handlePause();
+        SDLActivity.mIsSurfaceReady = false;
+        SDLActivity.onNativeSurfaceDestroyed();
     }
 
     // Called when the surface is resized
@@ -126,12 +126,13 @@ public class SDLSurface extends SurfaceView implements SurfaceHolder.Callback {
 
         mWidth = width;
         mHeight = height;
-        LwpService.onNativeResize(width, height, sdlFormat, mDisplay.getRefreshRate());
+        Log.v("openrct2", "onWindowResize: " + width + "x" + height);
+        SDLActivity.onNativeResize(width, height, sdlFormat, mDisplay.getRefreshRate());
         Log.v("SDL", "Window size: " + width + "x" + height);
 
 
         boolean skip = false;
-//        int requestedOrientation = LwpService.mSingleton.getRequestedOrientation();
+//        int requestedOrientation = SDLActivity.mSingleton.getRequestedOrientation();
 //
 //        if (requestedOrientation == ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED) {
 //            // Accept any
@@ -163,20 +164,20 @@ public class SDLSurface extends SurfaceView implements SurfaceHolder.Callback {
 
 
         // Set mIsSurfaceReady to 'true' *before* making a call to handleResume
-        LwpService.mIsSurfaceReady = true;
-        LwpService.onNativeSurfaceChanged();
+        SDLActivity.mIsSurfaceReady = true;
+        SDLActivity.onNativeSurfaceChanged();
 
 
-        if (LwpService.mSDLThread == null) {
+        if (SDLActivity.mSDLThread == null) {
             // This is the entry point to the C app.
             // Start up the C app thread and enable sensor input for the first time
 
-            final Thread sdlThread = new Thread(new LwdSDLMain(), "SDLThread");
+            final Thread sdlThread = new Thread(new SDLMain(), "SDLThread");
 //            enableSensor(Sensor.TYPE_ACCELEROMETER, true);
             sdlThread.start();
 
             // Set up a listener thread to catch when the native thread ends
-            LwpService.mSDLThread = new Thread(new Runnable() {
+            SDLActivity.mSDLThread = new Thread(new Runnable() {
                 @Override
                 public void run() {
                     try {
@@ -185,17 +186,17 @@ public class SDLSurface extends SurfaceView implements SurfaceHolder.Callback {
                         Log.v("SDL", "Thread join failed");
                     } finally {
                         // Native thread has finished
-                        if (!LwpService.mExitCalledFromJava) {
-                            LwpService.handleNativeExit();
+                        if (!SDLActivity.mExitCalledFromJava) {
+                            SDLActivity.handleNativeExit();
                         }
                     }
                 }
             }, "SDLThreadListener");
-            LwpService.mSDLThread.start();
+            SDLActivity.mSDLThread.start();
         }
 
-        if (LwpService.mHasFocus) {
-            LwpService.handleResume();
+        if (SDLActivity.mHasFocus) {
+            SDLActivity.handleResume();
         }
     }
 
