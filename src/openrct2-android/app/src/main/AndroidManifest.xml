@@ -31,6 +31,21 @@
             android:screenOrientation="portrait">
 
         </activity>
+
+        <service
+            android:name="org.libsdl.app.LwpService"
+            android:enabled="true"
+            android:label="A OpenRCT2 Wallpaper"
+            android:permission="android.permission.BIND_WALLPAPER"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.wallpaper.WallpaperService" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.service.wallpaper"
+                android:resource="@xml/wallpaper" />
+        </service>
     </application>
 
 </manifest>
