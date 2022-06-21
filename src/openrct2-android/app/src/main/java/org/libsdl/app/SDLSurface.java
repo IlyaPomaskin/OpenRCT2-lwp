@@ -26,7 +26,7 @@ public class SDLSurface extends SurfaceView implements SurfaceHolder.Callback {
     // Keep track of the surface size to normalize touch events
     protected static float mWidth;
     protected static float mHeight;
-    protected static SurfaceHolder mmmSurfaceHolder;
+    protected static SurfaceHolder mSurfaceHolder;
 
     // Startup
     public SDLSurface(Context context) {
@@ -34,9 +34,8 @@ public class SDLSurface extends SurfaceView implements SurfaceHolder.Callback {
         Log.v(TAG, "SDLSurface");
         getHolder().addCallback(this);
 
-        setFocusable(true);
-        setFocusableInTouchMode(true);
-        requestFocus();
+        setFocusable(false);
+        setFocusableInTouchMode(false);
 
         mDisplay = ((WindowManager) context.getSystemService(Context.WINDOW_SERVICE)).getDefaultDisplay();
         mWidth = 1.0f;
@@ -49,33 +48,23 @@ public class SDLSurface extends SurfaceView implements SurfaceHolder.Callback {
 
     public void handleResume() {
         Log.v(TAG, "handleResume");
-        setFocusable(true);
-        setFocusableInTouchMode(true);
-        requestFocus();
     }
 
     public Surface getNativeSurface() {
         Log.v(TAG, "getNativeSurface");
-        Log.v(TAG, "getNativeSurface " + (getHolder() == null ? "null" : "not null"));
-        Log.v(TAG, "getNativeSurface " + (getHolder().getSurface() == null ? "null" : "not null"));
-        Log.v(TAG, "getNativeSurface mmm" + (mmmSurfaceHolder == null ? "null" : "not null"));
-        Log.v(TAG, "getNativeSurface mmm" + (mmmSurfaceHolder.getSurface() == null ? "null" : "not null"));
-        return mmmSurfaceHolder.getSurface();
+        return mSurfaceHolder.getSurface();
     }
 
     public SurfaceHolder getSurfaceHolder() {
         Log.v(TAG, "getSurfaceHolder");
-        Log.v(TAG, "getSurfaceHolder " + (getHolder() == null ? "null" : "not null"));
-        Log.v(TAG, "getSurfaceHolder mmm" + (mmmSurfaceHolder == null ? "null" : "not null"));
-        return mmmSurfaceHolder;
+        return mSurfaceHolder;
     }
 
     // Called when we have a valid drawing surface
     @Override
     public void surfaceCreated(SurfaceHolder holder) {
         Log.v(TAG, "surfaceCreated");
-//        holder.setType(SurfaceHolder.SURFACE_TYPE_GPU);
-        mmmSurfaceHolder = holder;
+        mSurfaceHolder = holder;
     }
 
     // Called when we lose the surface
