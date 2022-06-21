@@ -3,28 +3,24 @@ package org.libsdl.app;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
-import android.graphics.PixelFormat;
 import android.media.AudioRecord;
 import android.media.AudioTrack;
 import android.os.Handler;
 import android.os.Message;
 import android.service.wallpaper.WallpaperService;
 import android.util.Log;
-import android.view.Display;
 import android.view.MotionEvent;
 import android.view.Surface;
 import android.view.SurfaceHolder;
-import android.view.SurfaceView;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.WindowManager;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Method;
 
 public class SDLActivity extends WallpaperService {
-    private static final String TAG = "SDLActivity";
+    private static String TAG = "SDLActivity";
     public static boolean mIsPaused, mIsSurfaceReady, mHasFocus;
     public static boolean mExitCalledFromJava;
     /**
@@ -33,7 +29,6 @@ public class SDLActivity extends WallpaperService {
     public static boolean mBrokenLibraries;
     public static boolean mSeparateMouseAndTouch;
     public static SDLActivity mSingleton;
-    protected static SDLSurface mSurface;
     protected static View mTextEdit;
     protected static ViewGroup mLayout;
     public static Thread mSDLThread;
@@ -88,7 +83,6 @@ public class SDLActivity extends WallpaperService {
     public static void initialize() {
         Log.v(TAG, "initialize");
         mSingleton = null;
-        mSurface = null;
         mTextEdit = null;
         mLayout = null;
         mSDLThread = null;
@@ -103,6 +97,7 @@ public class SDLActivity extends WallpaperService {
 
     @Override
     public void onCreate() {
+        TAG = TAG + Math.round((Math.random() * 10));
         Log.v(TAG, "Device: " + android.os.Build.DEVICE);
         Log.v(TAG, "Model: " + android.os.Build.MODEL);
         Log.v(TAG, "onCreate(): " + mSingleton);
@@ -141,8 +136,6 @@ public class SDLActivity extends WallpaperService {
 
             return;
         }
-
-        mSurface = new SDLSurface(getApplication());
     }
 
     @Override
@@ -194,7 +187,6 @@ public class SDLActivity extends WallpaperService {
         if (!SDLActivity.mIsPaused && SDLActivity.mIsSurfaceReady) {
             SDLActivity.mIsPaused = true;
             SDLActivity.nativePause();
-            mSurface.handlePause();
         }
     }
 
@@ -208,7 +200,6 @@ public class SDLActivity extends WallpaperService {
         if (SDLActivity.mIsPaused && SDLActivity.mIsSurfaceReady) {
             SDLActivity.mIsPaused = false;
             SDLActivity.nativeResume();
-            mSurface.handleResume();
         }
     }
 
@@ -216,7 +207,6 @@ public class SDLActivity extends WallpaperService {
     public static void handleNativeExit() {
         Log.v(TAG, "handleNativeExit");
         SDLActivity.mSDLThread = null;
-//        mSingleton.finish();
         SDLActivity.mSingleton.stopSelf();
     }
 
@@ -407,7 +397,7 @@ public class SDLActivity extends WallpaperService {
      */
     public static Surface getNativeSurface() {
         Log.v(TAG, "getNativeSurface");
-        return SDLActivity.mSurface.getNativeSurface();
+        return engine.getSurfaceHolder().getSurface();
     }
 
     /**
@@ -601,53 +591,26 @@ public class SDLActivity extends WallpaperService {
             return -1; // implementation broken
         }
 
-        // collect arguments for Dialog
-//
-//        final Bundle args = new Bundle();
-//        args.putInt("flags", flags);
-//        args.putString("title", title);
-//        args.putString("message", message);
-//        args.putIntArray("buttonFlags", buttonFlags);
-//        args.putIntArray("buttonIds", buttonIds);
-//        args.putStringArray("buttonTexts", buttonTexts);
-//        args.putIntArray("colors", colors);
-
         System.out.printf("title: %s message: %s\n", title, message);
-
-        // trigger Dialog creation on UI thread
-//
-//        (new Runnable() {
-//            @Override
-//            public void run() {
-////                showDialog(dialogs++, args);
-//            }
-//        }).run();
-
-        // block the calling thread
-
-//        synchronized (messageboxSelection) {
-//            try {
-//                messageboxSelection.wait();
-//            } catch (InterruptedException ex) {
-//                ex.printStackTrace();
-//                return -1;
-//            }
-//        }
-
-        // return selected value
 
         return messageboxSelection[0];
     }
 
+    public static LwpEngine engine;
 
     @Override
     public Engine onCreateEngine() {
         Log.v(TAG, "onCreateEngine");
-        return new LwpEngine();
+
+        if (engine == null) {
+            engine = new LwpEngine();
+        }
+
+        return engine;
     }
 
     class LwpEngine extends Engine {
-        private final SDLSurface mSurf = new SDLSurface(getApplication());
+        private final SDLSurface mSurface = new SDLSurface(SDLActivity.getContext());
 
         LwpEngine() {
             super();
@@ -658,9 +621,11 @@ public class SDLActivity extends WallpaperService {
         public void onVisibilityChanged(boolean visible) {
             Log.v(TAG, "onVisibilityChange " + (visible ? "true" : "false"));
             if (visible) {
-                mSurf.handleResume();
+                SDLActivity.handleResume();
+//                mSurface.handleResume();
             } else {
-                mSurf.handlePause();
+                SDLActivity.handlePause();
+//                mSurface.handlePause();
             }
         }
 
@@ -673,25 +638,25 @@ public class SDLActivity extends WallpaperService {
         @Override
         public SurfaceHolder getSurfaceHolder() {
             Log.v(TAG, "Engine getSurfaceHolder");
-            return mSurf.getSurfaceHolder();
+            return mSurface.getSurfaceHolder();
         }
 
         @Override
         public void onSurfaceCreated(SurfaceHolder holder) {
             Log.v(TAG, "Engine onSurfaceCreated");
-            mSurf.surfaceCreated(holder);
+            mSurface.surfaceCreated(holder);
         }
 
         @Override
         public void onSurfaceChanged(SurfaceHolder holder, int format, int width, int height) {
             Log.v(TAG, "Engine onSurfaceChanged");
-            mSurf.surfaceChanged(holder, format, width, height);
+            mSurface.surfaceChanged(holder, format, width, height);
         }
 
         @Override
         public void onSurfaceDestroyed(SurfaceHolder holder) {
             Log.v(TAG, "Engine onSurfaceDestroyed");
-            mSurf.surfaceDestroyed(holder);
+            mSurface.surfaceDestroyed(holder);
         }
     }
 
