@@ -33,7 +33,7 @@
         </activity>
 
         <service
-            android:name="org.libsdl.app.LwpService"
+            android:name=".LwpService"
             android:enabled="true"
             android:label="A OpenRCT2 Wallpaper"
             android:permission="android.permission.BIND_WALLPAPER"

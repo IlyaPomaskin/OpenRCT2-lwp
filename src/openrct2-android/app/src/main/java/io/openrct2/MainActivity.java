@@ -113,7 +113,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void startGame() {
-        copyAssets(); // TODO Don't copy/enumerate assets on every startup
+//        copyAssets(); // TODO Don't copy/enumerate assets on every startup
         Intent intent = new Intent(this, GameActivity.class);
         if (getIntent().hasExtra("commandLineArgs")) {
             intent.putExtra("commandLineArgs", getIntent().getStringArrayExtra("commandLineArgs"));

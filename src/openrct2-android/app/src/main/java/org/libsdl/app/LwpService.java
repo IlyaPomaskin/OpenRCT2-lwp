@@ -51,6 +51,7 @@ public class LwpService extends WallpaperService {
             "speexdsp",
             "png16",
             "SDL2-2.0",
+//            "main",
             "openrct2",
             "openrct2-ui"
         };
@@ -58,6 +59,8 @@ public class LwpService extends WallpaperService {
 
     public void loadLibraries() {
         for (String lib : getLibraries()) {
+            Log.v("io.openrct2", "Load library");
+            Log.v("io.openrct2", lib);
             System.loadLibrary(lib);
         }
     }

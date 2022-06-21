@@ -155,11 +155,11 @@ public class SDLSurface extends SurfaceView implements SurfaceHolder.Callback {
 //                skip = false;
 //            }
 //        }
-
-        if (skip) {
-            Log.v("SDL", "Skip .. Surface is not ready.");
-            return;
-        }
+//
+//        if (skip) {
+//            Log.v("SDL", "Skip .. Surface is not ready.");
+//            return;
+//        }
 
 
         // Set mIsSurfaceReady to 'true' *before* making a call to handleResume
@@ -182,7 +182,7 @@ public class SDLSurface extends SurfaceView implements SurfaceHolder.Callback {
                     try {
                         sdlThread.join();
                     } catch (Exception e) {
-                        Log.v("SDL", "Thread join failed")
+                        Log.v("SDL", "Thread join failed");
                     } finally {
                         // Native thread has finished
                         if (!LwpService.mExitCalledFromJava) {
