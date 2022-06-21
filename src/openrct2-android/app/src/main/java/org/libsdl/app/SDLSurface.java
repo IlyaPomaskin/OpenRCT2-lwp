@@ -1,22 +1,12 @@
 package org.libsdl.app;
 
 import android.content.Context;
-import android.content.pm.ActivityInfo;
 import android.graphics.PixelFormat;
-import android.hardware.Sensor;
-import android.hardware.SensorEvent;
-import android.hardware.SensorEventListener;
-import android.hardware.SensorManager;
-import android.os.Build;
 import android.util.Log;
 import android.view.Display;
-import android.view.InputDevice;
-import android.view.KeyEvent;
-import android.view.MotionEvent;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
-import android.view.View;
 import android.view.WindowManager;
 
 
@@ -62,6 +52,10 @@ public class SDLSurface extends SurfaceView implements SurfaceHolder.Callback {
         return getHolder().getSurface();
     }
 
+    public SurfaceHolder getSurfaceHolder() {
+        return getHolder();
+    }
+
     // Called when we have a valid drawing surface
     @Override
     public void surfaceCreated(SurfaceHolder holder) {
@@ -74,9 +68,9 @@ public class SDLSurface extends SurfaceView implements SurfaceHolder.Callback {
     public void surfaceDestroyed(SurfaceHolder holder) {
         Log.v("SDL", "surfaceDestroyed()");
         // Call this *before* setting mIsSurfaceReady to 'false'
-        SDLActivity.handlePause();
-        SDLActivity.mIsSurfaceReady = false;
-        SDLActivity.onNativeSurfaceDestroyed();
+        LwpService.handlePause();
+        LwpService.mIsSurfaceReady = false;
+        LwpService.onNativeSurfaceDestroyed();
     }
 
     // Called when the surface is resized
@@ -132,35 +126,35 @@ public class SDLSurface extends SurfaceView implements SurfaceHolder.Callback {
 
         mWidth = width;
         mHeight = height;
-        SDLActivity.onNativeResize(width, height, sdlFormat, mDisplay.getRefreshRate());
+        LwpService.onNativeResize(width, height, sdlFormat, mDisplay.getRefreshRate());
         Log.v("SDL", "Window size: " + width + "x" + height);
 
 
         boolean skip = false;
-        int requestedOrientation = SDLActivity.mSingleton.getRequestedOrientation();
-
-        if (requestedOrientation == ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED) {
-            // Accept any
-        } else if (requestedOrientation == ActivityInfo.SCREEN_ORIENTATION_PORTRAIT) {
-            if (mWidth > mHeight) {
-                skip = true;
-            }
-        } else if (requestedOrientation == ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE) {
-            if (mWidth < mHeight) {
-                skip = true;
-            }
-        }
+//        int requestedOrientation = LwpService.mSingleton.getRequestedOrientation();
+//
+//        if (requestedOrientation == ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED) {
+//            // Accept any
+//        } else if (requestedOrientation == ActivityInfo.SCREEN_ORIENTATION_PORTRAIT) {
+//            if (mWidth > mHeight) {
+//                skip = true;
+//            }
+//        } else if (requestedOrientation == ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE) {
+//            if (mWidth < mHeight) {
+//                skip = true;
+//            }
+//        }
 
         // Special Patch for Square Resolution: Black Berry Passport
-        if (skip) {
-            double min = Math.min(mWidth, mHeight);
-            double max = Math.max(mWidth, mHeight);
-
-            if (max / min < 1.20) {
-                Log.v("SDL", "Don't skip on such aspect-ratio. Could be a square resolution.");
-                skip = false;
-            }
-        }
+//        if (skip) {
+//            double min = Math.min(mWidth, mHeight);
+//            double max = Math.max(mWidth, mHeight);
+//
+//            if (max / min < 1.20) {
+//                Log.v("SDL", "Don't skip on such aspect-ratio. Could be a square resolution.");
+//                skip = false;
+//            }
+//        }
 
         if (skip) {
             Log.v("SDL", "Skip .. Surface is not ready.");
@@ -169,38 +163,39 @@ public class SDLSurface extends SurfaceView implements SurfaceHolder.Callback {
 
 
         // Set mIsSurfaceReady to 'true' *before* making a call to handleResume
-        SDLActivity.mIsSurfaceReady = true;
-        SDLActivity.onNativeSurfaceChanged();
+        LwpService.mIsSurfaceReady = true;
+        LwpService.onNativeSurfaceChanged();
 
 
-        if (SDLActivity.mSDLThread == null) {
+        if (LwpService.mSDLThread == null) {
             // This is the entry point to the C app.
             // Start up the C app thread and enable sensor input for the first time
 
-            final Thread sdlThread = new Thread(new SDLMain(), "SDLThread");
+            final Thread sdlThread = new Thread(new LwdSDLMain(), "SDLThread");
 //            enableSensor(Sensor.TYPE_ACCELEROMETER, true);
             sdlThread.start();
 
             // Set up a listener thread to catch when the native thread ends
-            SDLActivity.mSDLThread = new Thread(new Runnable() {
+            LwpService.mSDLThread = new Thread(new Runnable() {
                 @Override
                 public void run() {
                     try {
                         sdlThread.join();
                     } catch (Exception e) {
+                        Log.v("SDL", "Thread join failed")
                     } finally {
                         // Native thread has finished
-                        if (!SDLActivity.mExitCalledFromJava) {
-                            SDLActivity.handleNativeExit();
+                        if (!LwpService.mExitCalledFromJava) {
+                            LwpService.handleNativeExit();
                         }
                     }
                 }
             }, "SDLThreadListener");
-            SDLActivity.mSDLThread.start();
+            LwpService.mSDLThread.start();
         }
 
-        if (SDLActivity.mHasFocus) {
-            SDLActivity.handleResume();
+        if (LwpService.mHasFocus) {
+            LwpService.handleResume();
         }
     }
 
