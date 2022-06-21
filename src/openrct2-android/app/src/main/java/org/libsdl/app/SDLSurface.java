@@ -18,7 +18,7 @@ import android.view.WindowManager;
  */
 
 public class SDLSurface extends SurfaceView implements SurfaceHolder.Callback {
-    private final String TAG = "SDLSurface";
+    private String TAG = "SDLSurface";
 
     // Sensors
 //    protected static SensorManager mSensorManager;
@@ -26,11 +26,12 @@ public class SDLSurface extends SurfaceView implements SurfaceHolder.Callback {
     // Keep track of the surface size to normalize touch events
     protected static float mWidth;
     protected static float mHeight;
-    protected static SurfaceHolder mSurfaceHolder;
+    private SurfaceHolder mSurfaceHolder;
 
     // Startup
     public SDLSurface(Context context) {
         super(context);
+        TAG = TAG + Math.round((Math.random() * 10));
         Log.v(TAG, "SDLSurface");
         getHolder().addCallback(this);
 
@@ -40,14 +41,6 @@ public class SDLSurface extends SurfaceView implements SurfaceHolder.Callback {
         mDisplay = ((WindowManager) context.getSystemService(Context.WINDOW_SERVICE)).getDefaultDisplay();
         mWidth = 1.0f;
         mHeight = 1.0f;
-    }
-
-    public void handlePause() {
-        Log.v(TAG, "handlePause");
-    }
-
-    public void handleResume() {
-        Log.v(TAG, "handleResume");
     }
 
     public Surface getNativeSurface() {
