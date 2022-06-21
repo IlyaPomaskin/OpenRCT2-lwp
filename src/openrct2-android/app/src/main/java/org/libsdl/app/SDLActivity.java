@@ -205,7 +205,7 @@ public class SDLActivity extends WallpaperService {
      */
     public static void handleResume() {
         Log.v(TAG, "handleResume");
-        if (SDLActivity.mIsPaused && SDLActivity.mIsSurfaceReady && SDLActivity.mHasFocus) {
+        if (SDLActivity.mIsPaused && SDLActivity.mIsSurfaceReady) {
             SDLActivity.mIsPaused = false;
             SDLActivity.nativeResume();
             mSurface.handleResume();
@@ -656,7 +656,7 @@ public class SDLActivity extends WallpaperService {
 
         @Override
         public void onVisibilityChanged(boolean visible) {
-            Log.v(TAG, "onVisibilityChange");
+            Log.v(TAG, "onVisibilityChange " + (visible ? "true" : "false"));
             if (visible) {
                 mSurf.handleResume();
             } else {
