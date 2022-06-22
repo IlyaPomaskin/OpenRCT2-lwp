@@ -1,11 +1,7 @@
 package org.libsdl.app;
 
-import android.app.AlertDialog;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.graphics.PixelFormat;
-import android.media.AudioRecord;
-import android.media.AudioTrack;
 import android.os.Handler;
 import android.os.Message;
 import android.service.wallpaper.WallpaperService;
@@ -14,8 +10,6 @@ import android.view.Display;
 import android.view.MotionEvent;
 import android.view.Surface;
 import android.view.SurfaceHolder;
-import android.view.View;
-import android.view.ViewGroup;
 import android.view.WindowManager;
 
 import java.io.IOException;
@@ -33,10 +27,6 @@ public class SDLActivity extends WallpaperService {
     public static boolean mSeparateMouseAndTouch;
     public static SDLActivity mSingleton;
     private static SDLEngine mEngine;
-    protected static View mTextEdit;
-    protected static ViewGroup mLayout;
-    protected static AudioTrack mAudioTrack;
-    protected static AudioRecord mAudioRecord;
 
     /**
      * This method is called by SDL before loading the native shared libraries.
@@ -86,10 +76,6 @@ public class SDLActivity extends WallpaperService {
     public static void initialize() {
         Log.v(TAG, "initialize");
         mSingleton = null;
-        mTextEdit = null;
-        mLayout = null;
-        mAudioTrack = null;
-        mAudioRecord = null;
         mExitCalledFromJava = false;
         mBrokenLibraries = false;
         mIsPaused = false;
@@ -100,8 +86,6 @@ public class SDLActivity extends WallpaperService {
     @Override
     public void onCreate() {
         TAG = TAG + Math.round((Math.random() * 10));
-        Log.v(TAG, "Device: " + android.os.Build.DEVICE);
-        Log.v(TAG, "Model: " + android.os.Build.MODEL);
         Log.v(TAG, "onCreate(): " + mSingleton);
         super.onCreate();
 
@@ -118,25 +102,10 @@ public class SDLActivity extends WallpaperService {
         }
 
         if (mBrokenLibraries) {
-            AlertDialog.Builder dlgAlert = new AlertDialog.Builder(this);
-            dlgAlert.setMessage("An error occurred while trying to start the application. Please try again and/or reinstall."
+            Log.v(TAG, "An error occurred while trying to start the application. Please try again and/or reinstall."
                 + System.getProperty("line.separator")
                 + System.getProperty("line.separator")
                 + "Error: " + errorMsgBrokenLib);
-            dlgAlert.setTitle("SDL Error");
-            dlgAlert.setPositiveButton("Exit",
-                new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int id) {
-                        // if this button is clicked, close current activity
-//                        LwpService.mSingleton.finish();
-                        SDLActivity.mSingleton.stopSelf();
-                    }
-                });
-            dlgAlert.setCancelable(false);
-            dlgAlert.create().show();
-
-            return;
         }
     }
 
@@ -182,76 +151,6 @@ public class SDLActivity extends WallpaperService {
         super.onDestroy();
         // Reset everything in case the user re opens the app
         SDLActivity.initialize();
-    }
-
-    // Messages from the SDLMain thread
-    static final int COMMAND_CHANGE_TITLE = 1;
-    static final int COMMAND_UNUSED = 2;
-    static final int COMMAND_TEXTEDIT_HIDE = 3;
-    static final int COMMAND_SET_KEEP_SCREEN_ON = 5;
-
-    protected static final int COMMAND_USER = 0x8000;
-
-    /**
-     * This method is called by SDL if SDL did not handle a message itself.
-     * This happens if a received message contains an unsupported command.
-     * Method can be overwritten to handle Messages in a different class.
-     *
-     * @param command the command of the message.
-     * @param param   the parameter of the message. May be null.
-     * @return if the message was handled in overridden method.
-     */
-    protected boolean onUnhandledMessage(int command, Object param) {
-        Log.v(TAG, "onUnhandledMessage");
-        return false;
-    }
-
-    /**
-     * A Handler class for Messages from native SDL applications.
-     * It uses current Activities as target (e.g. for the title).
-     * static to prevent implicit references to enclosing object.
-     */
-    protected static class SDLCommandHandler extends Handler {
-        @Override
-        public void handleMessage(Message msg) {
-            Log.v(TAG, "handleMessage");
-            Context context = getContext();
-            if (context == null) {
-                Log.e(TAG, "error handling message, getContext() returned null");
-                return;
-            }
-            switch (msg.arg1) {
-                case COMMAND_CHANGE_TITLE:
-                case COMMAND_TEXTEDIT_HIDE:
-                    break;
-                case COMMAND_SET_KEEP_SCREEN_ON: {
-//                    Window window = ((Activity) context).getWindow();
-//                    if (window != null) {
-//                        if ((msg.obj instanceof Integer) && (((Integer) msg.obj).intValue() != 0)) {
-//                            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-//                        } else {
-//                            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-//                        }
-//                    }
-                    break;
-                }
-                default:
-                    if ((context instanceof SDLActivity) && !((SDLActivity) context).onUnhandledMessage(msg.arg1, msg.obj)) {
-                        Log.e(TAG, "error handling message, command is " + msg.arg1);
-                    }
-            }
-        }
-    }
-
-    Handler commandHandler = new SDLActivity.SDLCommandHandler();
-
-    // Send a message from the SDLMain thread
-    boolean sendCommand(int command, Object data) {
-        Log.v(TAG, "sendCommand");
-        Message msg = commandHandler.obtainMessage();
-        msg.arg1 = command;
-        msg.obj = data;
-        return commandHandler.sendMessage(msg);
     }
 
     public static native int nativeInit(Object arguments);
@@ -308,15 +207,14 @@ public class SDLActivity extends WallpaperService {
      * This method is called by SDL using JNI.
      */
     public static boolean setActivityTitle(String title) {
-        // Called from SDLMain() thread and can't directly affect the view
-        return mSingleton.sendCommand(COMMAND_CHANGE_TITLE, title);
+        return true;
     }
 
     /**
      * This method is called by SDL using JNI.
      */
     public static boolean sendMessage(int command, int param) {
-        return mSingleton.sendCommand(command, Integer.valueOf(param));
+        return true;
     }
 
     /**
