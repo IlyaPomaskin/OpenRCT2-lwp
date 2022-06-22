@@ -3,17 +3,20 @@ package org.libsdl.app;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.graphics.PixelFormat;
 import android.media.AudioRecord;
 import android.media.AudioTrack;
 import android.os.Handler;
 import android.os.Message;
 import android.service.wallpaper.WallpaperService;
 import android.util.Log;
+import android.view.Display;
 import android.view.MotionEvent;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowManager;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -29,9 +32,9 @@ public class SDLActivity extends WallpaperService {
     public static boolean mBrokenLibraries;
     public static boolean mSeparateMouseAndTouch;
     public static SDLActivity mSingleton;
+    private static SDLEngine mEngine;
     protected static View mTextEdit;
     protected static ViewGroup mLayout;
-    public static Thread mSDLThread;
     protected static AudioTrack mAudioTrack;
     protected static AudioRecord mAudioRecord;
 
@@ -85,7 +88,6 @@ public class SDLActivity extends WallpaperService {
         mSingleton = null;
         mTextEdit = null;
         mLayout = null;
-        mSDLThread = null;
         mAudioTrack = null;
         mAudioRecord = null;
         mExitCalledFromJava = false;
@@ -166,50 +168,21 @@ public class SDLActivity extends WallpaperService {
         SDLActivity.nativeQuit();
 
         // Now wait for the SDL thread to quit
-        if (SDLActivity.mSDLThread != null) {
+        if (mEngine.mSDLThread != null) {
             try {
-                SDLActivity.mSDLThread.join();
+                mEngine.mSDLThread.join();
             } catch (Exception e) {
                 Log.v(TAG, "Problem stopping thread: " + e);
             }
-            SDLActivity.mSDLThread = null;
+            mEngine.mSDLThread = null;
 
-            //Log.v(TAG, "Finished waiting for SDL thread");
+            Log.v(TAG, "Finished waiting for SDL thread");
         }
 
         super.onDestroy();
         // Reset everything in case the user re opens the app
         SDLActivity.initialize();
     }
-
-    public static void handlePause() {
-        Log.v(TAG, "handlePause");
-        if (!SDLActivity.mIsPaused && SDLActivity.mIsSurfaceReady) {
-            SDLActivity.mIsPaused = true;
-            SDLActivity.nativePause();
-        }
-    }
-
-    /**
-     * Called by onResume or surfaceCreated. An actual resume should be done only when the surface is ready.
-     * Note: Some Android variants may send multiple surfaceChanged events, so we don't need to resume
-     * every time we get one of those events, only if it comes after surfaceDestroyed
-     */
-    public static void handleResume() {
-        Log.v(TAG, "handleResume");
-        if (SDLActivity.mIsPaused && SDLActivity.mIsSurfaceReady) {
-            SDLActivity.mIsPaused = false;
-            SDLActivity.nativeResume();
-        }
-    }
-
-    /* The native thread has finished */
-    public static void handleNativeExit() {
-        Log.v(TAG, "handleNativeExit");
-        SDLActivity.mSDLThread = null;
-        SDLActivity.mSingleton.stopSelf();
-    }
-
 
     // Messages from the SDLMain thread
     static final int COMMAND_CHANGE_TITLE = 1;
@@ -397,7 +370,7 @@ public class SDLActivity extends WallpaperService {
      */
     public static Surface getNativeSurface() {
         Log.v(TAG, "getNativeSurface");
-        return engine.getSurfaceHolder().getSurface();
+        return mEngine.mHolder.getSurface();
     }
 
     /**
@@ -596,36 +569,49 @@ public class SDLActivity extends WallpaperService {
         return messageboxSelection[0];
     }
 
-    public static LwpEngine engine;
+    public static SDLEngine engine;
 
     @Override
     public Engine onCreateEngine() {
         Log.v(TAG, "onCreateEngine");
 
-        if (engine == null) {
-            engine = new LwpEngine();
+        if (mEngine != null) {
+            Log.v(TAG, "Waiting for SDL thread");
+            if (mEngine.mSDLThread != null) {
+                SDLActivity.nativeQuit();
+                try {
+                    mEngine.mSDLThread.join();
+                } catch (Exception e) {
+                    Log.v(TAG, "Problem stopping thread: " + e);
+                }
+            }
+            Log.v(TAG, "SDL thread finished");
         }
-
-        return engine;
+        Log.v(TAG, "Creating SDL Engine");
+        mEngine = new SDLEngine();
+        return mEngine;
     }
 
-    class LwpEngine extends Engine {
-        private final SDLSurface mSurface = new SDLSurface(SDLActivity.getContext());
+    class SDLEngine extends Engine {
+        public String TAG = "SDLEngine";
+        public Thread mSDLThread;
+        private SurfaceHolder mHolder;
+        protected Display mDisplay;
 
-        LwpEngine() {
+        SDLEngine() {
             super();
-            Log.v(TAG, "LwpEngine");
+            TAG = TAG + Math.round((Math.random() * 10));
+            Log.v(TAG, "SDLEngine");
+            mDisplay = ((WindowManager) getContext().getSystemService(Context.WINDOW_SERVICE)).getDefaultDisplay();
         }
 
         @Override
         public void onVisibilityChanged(boolean visible) {
             Log.v(TAG, "onVisibilityChange " + (visible ? "true" : "false"));
             if (visible) {
-                SDLActivity.handleResume();
-//                mSurface.handleResume();
+                SDLActivity.nativeResume();
             } else {
-                SDLActivity.handlePause();
-//                mSurface.handlePause();
+                SDLActivity.nativePause();
             }
         }
 
@@ -638,25 +624,96 @@ public class SDLActivity extends WallpaperService {
         @Override
         public SurfaceHolder getSurfaceHolder() {
             Log.v(TAG, "Engine getSurfaceHolder");
-            return mSurface.getSurfaceHolder();
+            return mHolder;
         }
 
         @Override
         public void onSurfaceCreated(SurfaceHolder holder) {
             Log.v(TAG, "Engine onSurfaceCreated");
-            mSurface.surfaceCreated(holder);
+            if (mHolder == null) {
+                mHolder = holder;
+            }
         }
 
         @Override
         public void onSurfaceChanged(SurfaceHolder holder, int format, int width, int height) {
             Log.v(TAG, "Engine onSurfaceChanged");
-            mSurface.surfaceChanged(holder, format, width, height);
+
+            if (mHolder != holder) {
+                return;
+            }
+
+            super.onSurfaceCreated(holder);
+
+            int sdlFormat = 0x15151002; // SDL_PIXELFORMAT_RGB565 by default
+            switch (format) {
+                case PixelFormat.A_8:
+                    Log.v(TAG, "pixel format A_8");
+                    break;
+                case PixelFormat.LA_88:
+                    Log.v(TAG, "pixel format LA_88");
+                    break;
+                case PixelFormat.L_8:
+                    Log.v(TAG, "pixel format L_8");
+                    break;
+                case PixelFormat.RGBA_4444:
+                    Log.v(TAG, "pixel format RGBA_4444");
+                    sdlFormat = 0x15421002; // SDL_PIXELFORMAT_RGBA4444
+                    break;
+                case PixelFormat.RGBA_5551:
+                    Log.v(TAG, "pixel format RGBA_5551");
+                    sdlFormat = 0x15441002; // SDL_PIXELFORMAT_RGBA5551
+                    break;
+                case PixelFormat.RGBA_8888:
+                    Log.v(TAG, "pixel format RGBA_8888");
+                    sdlFormat = 0x16462004; // SDL_PIXELFORMAT_RGBA8888
+                    break;
+                case PixelFormat.RGBX_8888:
+                    Log.v(TAG, "pixel format RGBX_8888");
+                    sdlFormat = 0x16261804; // SDL_PIXELFORMAT_RGBX8888
+                    break;
+                case PixelFormat.RGB_332:
+                    Log.v(TAG, "pixel format RGB_332");
+                    sdlFormat = 0x14110801; // SDL_PIXELFORMAT_RGB332
+                    break;
+                case PixelFormat.RGB_565:
+                    Log.v(TAG, "pixel format RGB_565");
+                    sdlFormat = 0x15151002; // SDL_PIXELFORMAT_RGB565
+                    break;
+                case PixelFormat.RGB_888:
+                    Log.v(TAG, "pixel format RGB_888");
+                    // Not sure this is right, maybe SDL_PIXELFORMAT_RGB24 instead?
+                    sdlFormat = 0x16161804; // SDL_PIXELFORMAT_RGB888
+                    break;
+                default:
+                    Log.v(TAG, "pixel format unknown " + format);
+                    break;
+            }
+
+            SDLActivity.onNativeResize(width, height, sdlFormat, mDisplay.getRefreshRate());
+            SDLActivity.onNativeSurfaceChanged();
+
+            if (mSDLThread == null) {
+                Log.v(TAG, "Starting SDLThread");
+                mSDLThread = new Thread(new SDLMain(), "SDLThread");
+                mSDLThread.start();
+            } else {
+                Log.v(TAG, "SDLThread already exists");
+                SDLActivity.nativeResume();
+            }
         }
 
         @Override
         public void onSurfaceDestroyed(SurfaceHolder holder) {
             Log.v(TAG, "Engine onSurfaceDestroyed");
-            mSurface.surfaceDestroyed(holder);
+            if (holder == SDLActivity.mEngine.mHolder) {
+                Log.v(TAG, "Wrong destroyed");
+                super.onSurfaceDestroyed(holder);
+                SDLActivity.nativePause();
+                SDLActivity.onNativeSurfaceDestroyed();
+            } else {
+                Log.v(TAG, "Wrong destroyed");
+            }
         }
     }
 
