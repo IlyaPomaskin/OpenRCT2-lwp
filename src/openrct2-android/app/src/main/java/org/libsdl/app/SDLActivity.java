@@ -275,7 +275,7 @@ public class SDLActivity extends WallpaperService {
      * This method is called by SDL using JNI.
      */
     public static int audioOpen(int sampleRate, boolean is16Bit, boolean isStereo, int desiredFrames) {
-        return -1;
+        return 0;
     }
 
     /**
