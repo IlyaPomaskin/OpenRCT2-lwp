@@ -2,8 +2,6 @@ package org.libsdl.app;
 
 import android.content.Context;
 import android.graphics.PixelFormat;
-import android.os.Handler;
-import android.os.Message;
 import android.service.wallpaper.WallpaperService;
 import android.util.Log;
 import android.view.Display;
@@ -604,8 +602,14 @@ public class SDLActivity extends WallpaperService {
         @Override
         public void onSurfaceDestroyed(SurfaceHolder holder) {
             Log.v(TAG, "Engine onSurfaceDestroyed");
+            if (holder == getSurfaceHolder()) {
+                Log.v(TAG, "destroyed getSurfaceHolder()");
+            }
+            if (holder == mHolder) {
+                Log.v(TAG, "destroyed mHolder");
+            }
             if (holder == SDLActivity.mEngine.mHolder) {
-                Log.v(TAG, "Wrong destroyed");
+                Log.v(TAG, "destroyed SDLActivity.mEngine.mHolder");
                 super.onSurfaceDestroyed(holder);
                 SDLActivity.nativePause();
                 SDLActivity.onNativeSurfaceDestroyed();
