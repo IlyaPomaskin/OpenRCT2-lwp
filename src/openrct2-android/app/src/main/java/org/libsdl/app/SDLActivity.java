@@ -15,6 +15,9 @@ import java.io.InputStream;
 import java.lang.reflect.Method;
 
 public class SDLActivity extends WallpaperService {
+    public static int activityCounter = 0;
+    public static int engineCounter = 0;
+
     private static String TAG = "SDLActivity";
     public static boolean mIsPaused, mIsSurfaceReady, mHasFocus;
     public static boolean mExitCalledFromJava;
@@ -83,7 +86,8 @@ public class SDLActivity extends WallpaperService {
 
     @Override
     public void onCreate() {
-        TAG = TAG + Math.round((Math.random() * 10));
+        TAG = TAG + " ACT: " + SDLActivity.activityCounter;
+        SDLActivity.activityCounter++;
         Log.v(TAG, "onCreate(): " + mSingleton);
         super.onCreate();
 
@@ -219,7 +223,7 @@ public class SDLActivity extends WallpaperService {
      * This method is called by SDL using JNI.
      */
     public static Context getContext() {
-        Log.v(TAG, "getContext");
+        Log.v(TAG, "getContext: " + mSingleton.TAG);
         return mSingleton;
     }
 
@@ -265,7 +269,7 @@ public class SDLActivity extends WallpaperService {
      * This method is called by SDL using JNI.
      */
     public static Surface getNativeSurface() {
-        Log.v(TAG, "getNativeSurface");
+        Log.v(TAG, "getNativeSurface " + mEngine.TAG);
         return mEngine.mHolder.getSurface();
     }
 
@@ -484,7 +488,7 @@ public class SDLActivity extends WallpaperService {
             Log.v(TAG, "SDL thread finished");
         }
         Log.v(TAG, "Creating SDL Engine");
-        mEngine = new SDLEngine();
+        mEngine = new SDLEngine(TAG);
         return mEngine;
     }
 
@@ -494,9 +498,10 @@ public class SDLActivity extends WallpaperService {
         private SurfaceHolder mHolder;
         protected Display mDisplay;
 
-        SDLEngine() {
+        SDLEngine(String prefix) {
             super();
-            TAG = TAG + Math.round((Math.random() * 10));
+            TAG = prefix + ": " + TAG + " ENG: " + SDLActivity.engineCounter;
+            SDLActivity.engineCounter++;
             Log.v(TAG, "SDLEngine");
             mDisplay = ((WindowManager) getContext().getSystemService(Context.WINDOW_SERVICE)).getDefaultDisplay();
         }
